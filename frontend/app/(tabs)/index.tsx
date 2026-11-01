@@ -52,7 +52,7 @@ export default function HomeScreen() {
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.heroContent}>
-            <Text style={styles.greeting}>Olá, {user?.name?.split(" ")[0] ?? "paciente"} 👋</Text>
+            <Text style={styles.greeting}>Olá, {user?.name?.split(" ").find((p) => !/^(dr|dra)\.?$/i.test(p)) ?? "paciente"}</Text>
             <Text style={styles.heroTitle}>Pronto para cuidar do seu sorriso?</Text>
 
             <Pressable

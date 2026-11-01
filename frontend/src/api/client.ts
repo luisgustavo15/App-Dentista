@@ -34,7 +34,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const j = await resp.json();
       detail = j.detail ?? JSON.stringify(j);
     } catch {}
-    const err = new Error(`${resp.status}: ${detail}`) as Error & { status?: number };
+    const message = typeof detail === "string" ? detail : "Verifique os dados informados";
+    const err = new Error(message) as Error & { status?: number };
     err.status = resp.status;
     throw err;
   }

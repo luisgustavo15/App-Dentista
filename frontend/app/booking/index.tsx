@@ -2,7 +2,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Dentist, type Service } from "@/src/api/client";
@@ -37,6 +37,7 @@ export default function BookingScreen() {
   const [time, setTime] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const dates = useMemo(() => buildDates(14), []);
   const services = useQuery({ queryKey: ["services"], queryFn: () => api.get<Service[]>("/services") });
@@ -54,6 +55,7 @@ export default function BookingScreen() {
 
   const onConfirm = async () => {
     if (!canConfirm) return;
+    setError(null);
     setSubmitting(true);
     try {
       await api.post("/appointments", {
@@ -68,7 +70,8 @@ export default function BookingScreen() {
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
       router.replace({ pathname: "/booking/success", params: { date: date!, time: time!, service: service?.name ?? "" } });
     } catch (e: any) {
-      Alert.alert("Erro ao agendar", e?.message ?? "Tente novamente");
+      setError(e?.message ?? "Não foi possível agendar. Tente novamente.");
+      qc.invalidateQueries({ queryKey: ["slots", dentistId, date] });
     } finally {
       setSubmitting(false);
     }
@@ -204,6 +207,9 @@ export default function BookingScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        {error && (
+          <Text testID="booking-error" style={styles.errorText}>{error}</Text>
+        )}
         <Pressable
           testID="confirm-booking-btn"
           disabled={!canConfirm}
@@ -291,5 +297,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brandPrimary, paddingVertical: 16, borderRadius: radius.md,
     alignItems: "center", minHeight: 52, justifyContent: "center",
   },
+  errorText: { color: colors.error, fontSize: 13, fontWeight: "600", marginBottom: spacing.sm, textAlign: "center" },
   confirmText: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 15 },
 });

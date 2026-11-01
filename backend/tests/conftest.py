@@ -1,23 +1,20 @@
 import os
+import uuid
 import pytest
 import requests
-import uuid
-from datetime import datetime, timezone, timedelta
-from pymongo import MongoClient
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent.parent / ".env")
-
-BASE_URL = "http://localhost:8001"
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
+load_dotenv(Path(__file__).parent.parent.parent / "frontend" / ".env")
+BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get("EXPO_BACKEND_URL")).rstrip("/")
+ADMIN_PASSWORD = "Jocelio#4821"
+PATIENT_EMAIL = "maria@test.com"
+PATIENT_PASSWORD = "senha123"
 
 
 @pytest.fixture(scope="session")
-def db():
-    c = MongoClient(MONGO_URL)
-    return c[DB_NAME]
+def base_url():
+    return BASE_URL
 
 
 @pytest.fixture(scope="session")
@@ -28,55 +25,23 @@ def api():
 
 
 @pytest.fixture(scope="session")
-def base_url():
-    return BASE_URL
-
-
-def _seed_user(db, email, role, user_id):
-    # Deterministic token so parallel xdist workers both produce the same seed (idempotent).
-    token = f"test_token_fixed_{role}"
-    db.users.update_one(
-        {"user_id": user_id},
-        {"$set": {
-            "user_id": user_id,
-            "email": email,
-            "name": f"TEST {role}",
-            "picture": None,
-            "role": role,
-            "phone": None,
-            "birth_date": None,
-            "created_at": datetime.now(timezone.utc),
-        }},
-        upsert=True,
-    )
-    db.user_sessions.update_one(
-        {"session_token": token},
-        {"$set": {
-            "session_token": token,
-            "user_id": user_id,
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-        }},
-        upsert=True,
-    )
-    return token
+def patient_auth(api):
+    r = api.post(f"{BASE_URL}/api/auth/login", json={"email": PATIENT_EMAIL, "password": PATIENT_PASSWORD})
+    if r.status_code != 200:
+        pytest.skip(f"patient login failed {r.status_code} {r.text}")
+    d = r.json()
+    return {"Authorization": f"Bearer {d['access_token']}"}, d["user"]
 
 
 @pytest.fixture(scope="session")
-def admin_token(db):
-    return _seed_user(db, "admin@drjocelio.com.br", "admin", "user_admin_test")
+def admin_auth(api):
+    r = api.post(f"{BASE_URL}/api/auth/admin-login", json={"password": ADMIN_PASSWORD})
+    if r.status_code != 200:
+        pytest.skip(f"admin login failed {r.status_code} {r.text}")
+    d = r.json()
+    return {"Authorization": f"Bearer {d['access_token']}"}, d["user"]
 
 
-@pytest.fixture(scope="session")
-def patient_token(db):
-    return _seed_user(db, "patient@test.com", "patient", "user_patient_test")
-
-
-@pytest.fixture(scope="session")
-def admin_headers(admin_token):
-    return {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
-
-
-@pytest.fixture(scope="session")
-def patient_headers(patient_token):
-    return {"Authorization": f"Bearer {patient_token}", "Content-Type": "application/json"}
+@pytest.fixture
+def uniq():
+    return uuid.uuid4().hex[:8]

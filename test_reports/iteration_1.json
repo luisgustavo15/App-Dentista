@@ -1,0 +1,41 @@
+{
+  "summary": "Tested removal of Google login and the new JWT auth (patient e-mail/password + admin access password only). Backend: 17/17 pytest pass via the public URL. Covered register (201/409/422), login (200/401/429), admin-login (200/401), /auth/me (missing, tampered and forged tokens all 401), admin RBAC (403 for patients, 200 for admin) and the full appointment flow (slots, create, 409 double booking, mine, admin confirm, 400 on invalid status, cancel). Frontend (375x667): no Google button. 'Entrar'/'Criar conta' tabs work. Inline Portuguese errors show correctly (invalid e-mail, wrong password, short password, duplicate e-mail). Registering lands on Início with the greeting, and the Admin tab is hidden for patients. The session survives a page reload. Booking flow reaches the success screen and the appointment shows in Consultas as Pendente. Logout returns to the login screen. Admin mode asks only for the password, shows the Admin tab, and confirming an appointment changes its status to Confirmada. No deprecated Expo packages detected (expo-av, expo-barcode-scanner, expo-background-fetch not used).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/admin-login", "issue": "The rate-limit key uses request.client.host. Behind the ingress this is the internal proxy IP (10.232.x.x), so the admin key is effectively global. Anyone can lock the clinic out of the admin panel for 15 min by sending 5 wrong passwords (DoS). Use the X-Forwarded-For client IP and/or a different lockout strategy."},
+      {"endpoint": "POST /api/appointments", "issue": "No server-side check of the date/time format, past dates, past times today, or Sundays. available-slots returns 09:00-17:30 every day, including Sunday and Saturday afternoon, although the clinic hours are Mon-Fri 08-19 and Sat 09-13."},
+      {"endpoint": "POST /api/auth/login", "issue": "The admin seed e-mail 'admin@drjocelio.local' is rejected by EmailStr (.local is a special-use TLD), so login returns 422, not 401. This is harmless, since admin access is still blocked."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Home greeting for admin", "issue": "Shows 'Olá, Dr. 👋' because the first word of the name 'Dr. Jocélio' is used.", "testID": "n/a", "priority": "low"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Booking", "issues": ["The date strip starts today and offers Sundays; past time slots for today are selectable."]},
+      {"screen": "Consultas (admin)", "issues": ["The admin sees the patient 'Minhas Consultas'/'Agendar consulta' UI and can book appointments under the admin account. Consider hiding it for the admin."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_jwt_auth_appointments.py", "/app/backend/tests/conftest.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix admin-login brute-force lockout DoS: derive the client IP from X-Forwarded-For (ingress IPs are internal) and/or avoid a global lock for the admin key",
+    "Validate the appointment date/time server-side: format, not in the past, within clinic hours (no Sunday, Sat until 13:00). Filter past slots for today in available-slots",
+    "Optional: call queryClient.clear() on logout and on login to avoid cached data from the previous account (code-review risk, not reproduced)",
+    "Optional: fix the admin greeting ('Olá, Dr.')"
+  ],
+  "critical_code_review_comments": [
+    "AuthContext.logout does not clear the react-query cache (shared 'my-appointments' key across accounts). A leak was not reproduced in the UI, but it is a risk.",
+    "JWT is stateless with no revocation; logout only deletes the client token. This is acceptable for the scope.",
+    "The booking screen uses Alert.alert for API errors; on web, Alert can be a no-op, so booking errors (e.g. a 409 slot conflict) may be silent on the web preview."
+  ],
+  "updated_files": ["/app/backend/tests/conftest.py (rewritten for JWT, public URL)", "/app/backend/tests/test_jwt_auth_appointments.py (new)", "/app/backend/tests/test_backend.py (deleted - relied on removed user_sessions)"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Created TEST_*@example.com / test_ui_* / test_bk_* patients and a few appointments (dates far in the future from pytest; 05/11/2026 10:30 with Dra. Ana from the UI, now confirmed).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use EXPO_PUBLIC_BACKEND_URL from frontend/.env. Each pytest run causes 1 failed admin-login, and the limiter is a global per-identity counter (5 per 15 min, in-memory), so restart the backend before running the suite many times. In Playwright, use scroll_into_view_if_needed + a normal click on the booking options; force-clicking off-screen Pressables did not register.",
+  "rca_of_issue": ""
+}

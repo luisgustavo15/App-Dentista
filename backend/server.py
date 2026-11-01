@@ -4,12 +4,16 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import uuid
-import httpx
+import time
+import secrets
+import jwt
+import bcrypt
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -18,7 +22,14 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+JWT_SECRET = os.environ["JWT_SECRET"]
+ADMIN_ACCESS_PASSWORD = os.environ["ADMIN_ACCESS_PASSWORD"]
+JWT_ALG = "HS256"
+TOKEN_DAYS = 7
+ADMIN_USER_ID = "admin"
+
+# Per-process brute force limiter: max 5 failures per key in 15 minutes
+_failures: dict = {}
 
 app = FastAPI()
 
@@ -46,12 +57,24 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class SessionRequest(BaseModel):
-    session_id: str
+class RegisterIn(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=72)
+    phone: Optional[str] = None
 
 
-class SessionResponse(BaseModel):
-    session_token: str
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=72)
+
+
+class AdminLoginIn(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
+class AuthResponse(BaseModel):
+    access_token: str
     user: User
 
 
@@ -119,21 +142,50 @@ class ProfileUpdate(BaseModel):
 # ============================================================
 # Auth helpers
 # ============================================================
+def _hash_pw(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+
+def _check_pw(pw: str, stored: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode(), stored.encode())
+    except (ValueError, TypeError):
+        return False
+
+
+def _make_token(user_id: str, role: str) -> str:
+    now = datetime.now(timezone.utc)
+    claims = {"sub": user_id, "role": role, "iat": now, "exp": now + timedelta(days=TOKEN_DAYS),
+              "jti": secrets.token_urlsafe(12)}
+    return jwt.encode(claims, JWT_SECRET, algorithm=JWT_ALG)
+
+
+def _rate_key(request: Request, ident: str) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+    return f"{ip}:{ident.lower()}"
+
+
+def _allowed(key: str) -> bool:
+    now = time.time()
+    _failures[key] = [t for t in _failures.get(key, []) if now - t < 900]
+    return len(_failures[key]) < 5
+
+
+def _fail(key: str):
+    _failures.setdefault(key, []).append(time.time())
+
+
 async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid token")
     token = authorization.split(" ", 1)[1].strip()
-    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-    expires_at = session.get("expires_at")
-    if isinstance(expires_at, datetime):
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=401, detail="Session expired")
-    user_doc = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
-    if not user_doc:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user_doc = await db.users.find_one({"user_id": payload.get("sub")}, {"_id": 0, "password_hash": 0})
+    if not user_doc or user_doc.get("role") != payload.get("role"):
         raise HTTPException(status_code=401, detail="User not found")
     return User(**user_doc)
 
@@ -147,59 +199,43 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
 # ============================================================
 # Auth endpoints
 # ============================================================
-@api_router.post("/auth/session", response_model=SessionResponse)
-async def auth_session(payload: SessionRequest):
-    async with httpx.AsyncClient(timeout=15.0) as http:
-        try:
-            resp = await http.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": payload.session_id},
-            )
-        except Exception as e:
-            raise HTTPException(status_code=401, detail=f"Auth upstream error: {e}")
+@api_router.post("/auth/register", response_model=AuthResponse, status_code=201)
+async def auth_register(payload: RegisterIn):
+    email = str(payload.email).lower()
+    if await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1}):
+        raise HTTPException(status_code=409, detail="Este e-mail já está cadastrado")
+    user = User(user_id=f"user_{uuid.uuid4().hex[:12]}", email=email, name=payload.name.strip(),
+                phone=payload.phone, role="patient")
+    doc = user.model_dump()
+    doc["password_hash"] = _hash_pw(payload.password)
+    await db.users.insert_one(doc)
+    return AuthResponse(access_token=_make_token(user.user_id, "patient"), user=user)
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid session id")
 
-    data = resp.json()
-    email = data.get("email")
-    name = data.get("name") or email
-    picture = data.get("picture")
-    session_token = data.get("session_token")
-    if not email or not session_token:
-        raise HTTPException(status_code=401, detail="Invalid session data")
+@api_router.post("/auth/login", response_model=AuthResponse)
+async def auth_login(payload: LoginIn, request: Request):
+    email = str(payload.email).lower()
+    key = _rate_key(request, email)
+    if not _allowed(key):
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Tente novamente em 15 minutos.")
+    doc = await db.users.find_one({"email": email}, {"_id": 0})
+    if not doc or doc.get("role") != "patient" or not _check_pw(payload.password, doc.get("password_hash", "")):
+        _fail(key)
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
+    doc.pop("password_hash", None)
+    return AuthResponse(access_token=_make_token(doc["user_id"], "patient"), user=User(**doc))
 
-    email_lower = email.lower()
-    role = "admin" if email_lower in ADMIN_EMAILS else "patient"
 
-    existing = await db.users.find_one({"email": email_lower}, {"_id": 0})
-    if existing:
-        user_id = existing["user_id"]
-        # Keep role fresh if admin env changed
-        new_role = role if role == "admin" else existing.get("role", "patient")
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {"name": name, "picture": picture, "role": new_role}},
-        )
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    else:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        user_doc = User(
-            user_id=user_id, email=email_lower, name=name, picture=picture, role=role
-        ).model_dump()
-        await db.users.insert_one(user_doc)
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-
-    await db.user_sessions.insert_one(
-        {
-            "session_token": session_token,
-            "user_id": user_id,
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-        }
-    )
-
-    return SessionResponse(session_token=session_token, user=User(**user_doc))
+@api_router.post("/auth/admin-login", response_model=AuthResponse)
+async def auth_admin_login(payload: AdminLoginIn, request: Request):
+    key = _rate_key(request, "admin")
+    if not _allowed(key):
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Tente novamente em 15 minutos.")
+    if not secrets.compare_digest(payload.password.encode(), ADMIN_ACCESS_PASSWORD.encode()):
+        _fail(key)
+        raise HTTPException(status_code=401, detail="Senha de acesso incorreta")
+    doc = await db.users.find_one({"user_id": ADMIN_USER_ID}, {"_id": 0, "password_hash": 0})
+    return AuthResponse(access_token=_make_token(ADMIN_USER_ID, "admin"), user=User(**doc))
 
 
 @api_router.get("/auth/me", response_model=User)
@@ -208,10 +244,8 @@ async def auth_me(user: User = Depends(get_current_user)):
 
 
 @api_router.post("/auth/logout")
-async def auth_logout(authorization: Optional[str] = Header(None)):
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-        await db.user_sessions.delete_one({"session_token": token})
+async def auth_logout():
+    # Stateless JWT: the client deletes its token.
     return {"ok": True}
 
 
@@ -254,11 +288,32 @@ async def list_gallery():
 # ============================================================
 # Appointments
 # ============================================================
+CLINIC_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def _day_slots(date_str: str) -> List[str]:
+    """Slots inside clinic hours (Mon-Fri 08:00-19:00, Sat 09:00-13:00), future only."""
+    try:
+        day = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data inválida")
+    wd = day.weekday()
+    if wd == 6:
+        return []
+    start, end = (9, 13) if wd == 5 else (8, 19)
+    now = datetime.now(CLINIC_TZ)
+    slots = []
+    for h in range(start, end):
+        for m in (0, 30):
+            slot_dt = datetime(day.year, day.month, day.day, h, m, tzinfo=CLINIC_TZ)
+            if slot_dt > now:
+                slots.append(f"{h:02d}:{m:02d}")
+    return slots
+
+
 @api_router.get("/appointments/available-slots")
 async def available_slots(date: str, dentist_id: str, user: User = Depends(get_current_user)):
-    # Generate hourly slots 09:00-18:00, exclude any booked by this dentist on that date
-    all_slots = [f"{h:02d}:00" for h in range(9, 18)] + [f"{h:02d}:30" for h in range(9, 18)]
-    all_slots.sort()
+    all_slots = _day_slots(date)
     booked = await db.appointments.find(
         {"dentist_id": dentist_id, "date": date, "status": {"$ne": "cancelled"}},
         {"_id": 0, "time": 1},
@@ -273,6 +328,8 @@ async def create_appointment(payload: AppointmentCreate, user: User = Depends(ge
     dentist = await db.dentists.find_one({"id": payload.dentist_id}, {"_id": 0})
     if not service or not dentist:
         raise HTTPException(status_code=400, detail="Invalid service or dentist")
+    if payload.time not in _day_slots(payload.date):
+        raise HTTPException(status_code=400, detail="Horário fora do expediente ou já passou")
 
     # Block double-booking
     clash = await db.appointments.find_one(
@@ -444,9 +501,11 @@ async def startup_seed():
     # indexes
     await db.users.create_index("email", unique=True)
     await db.users.create_index("user_id", unique=True)
-    await db.user_sessions.create_index("session_token", unique=True)
-    await db.user_sessions.create_index("user_id")
-    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+
+    # Admin account (accessed only via ADMIN_ACCESS_PASSWORD)
+    if not await db.users.find_one({"user_id": ADMIN_USER_ID}, {"_id": 0, "user_id": 1}):
+        await db.users.insert_one(User(user_id=ADMIN_USER_ID, email="admin@drjocelio.local",
+                                       name="Dr. Jocélio", role="admin").model_dump())
 
     # seed services
     if await db.services.count_documents({}) == 0:

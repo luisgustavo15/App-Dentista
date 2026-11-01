@@ -3,10 +3,11 @@
 ## Visão geral
 App mobile (Expo/React Native) para a clínica odontológica do Dr. Jocélio, com área do paciente e painel administrativo em um único app.
 
-## Autenticação
-- Google OAuth via Emergent Auth (zero chave externa).
-- Papel atribuído no login: `admin` se email estiver em `backend/.env:ADMIN_EMAILS`, senão `patient`.
-- Token salvo em `expo-secure-store` (mobile) / `localStorage` (web).
+## Autenticação (atualizado — login Google removido a pedido do usuário)
+- Pacientes: cadastro e login com e-mail + senha (bcrypt, JWT de 7 dias).
+- Admin: apenas uma senha de acesso (`ADMIN_ACCESS_PASSWORD` em backend/.env), via link "Sou da clínica".
+- Limite de 5 tentativas erradas por IP real (X-Forwarded-For) em 15 min.
+- Token salvo em secure storage (mobile) / localStorage (web); cache limpo ao sair.
 
 ## Funcionalidades (paciente)
 - Home com saudação, próxima consulta, atalhos (Serviços, Equipe, Galeria, Contato), carrossel de serviços, destaque do Dr. Jocélio.
@@ -23,7 +24,7 @@ App mobile (Expo/React Native) para a clínica odontológica do Dr. Jocélio, co
 - Ações: Confirmar / Concluir / Cancelar.
 
 ## Backend (FastAPI + Motor + MongoDB)
-- `/api/auth/session`, `/api/auth/me`, `/api/auth/logout`, `/api/auth/profile`
+- `/api/auth/register`, `/api/auth/login`, `/api/auth/admin-login`, `/api/auth/me`, `/api/auth/logout`, `/api/auth/profile`
 - `/api/services`, `/api/dentists`, `/api/gallery`, `/api/clinic`
 - `/api/appointments/available-slots`, `/api/appointments`, `/api/appointments/mine`, `/api/appointments/{id}` (DELETE)
 - `/api/admin/appointments`, `/api/admin/appointments/{id}`, `/api/admin/stats`
@@ -39,3 +40,12 @@ App mobile (Expo/React Native) para a clínica odontológica do Dr. Jocélio, co
 ## Status
 - Backend: 23/23 testes passando (testing agent).
 - Frontend: tela de login validada visualmente.
+
+## Histórico
+- v1: MVP com login Google.
+- v2: Login Google trocado por e-mail/senha + senha de admin; horários respeitam expediente (Seg–Sex 08–19, Sáb 09–13, sem domingo, sem horários passados); erro de agendamento exibido na tela.
+
+## Backlog
+- P1: Dados reais da clínica (endereço, telefones, preços, fotos)
+- P1: Recuperação de senha por e-mail
+- P2: Ocultar fluxo de agendamento para a conta admin; lembretes por WhatsApp; prontuário digital
