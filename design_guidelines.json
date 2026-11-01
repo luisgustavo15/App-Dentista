@@ -1,0 +1,184 @@
+{
+  "app_name": "Clínica Odontológica Dr. Jocélio",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A calm, trustworthy, and frictionless patient experience pairing classic dental blue aesthetics with modern iOS-native readability and whitespace.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#111827",
+    "surfaceSecondary": "#F4F8FB",
+    "onSurfaceSecondary": "#374151",
+    "surfaceTertiary": "#E1EFFE",
+    "onSurfaceTertiary": "#1E40AF",
+    "surfaceInverse": "#111827",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#1A73E8",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#1A73E8",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#E8F0FE",
+    "onBrandSecondary": "#1A73E8",
+    "brandTertiary": "#D2E3FC",
+    "onBrandTertiary": "#174EA6",
+    "success": "#10B981",
+    "onSuccess": "#FFFFFF",
+    "warning": "#F59E0B",
+    "onWarning": "#FFFFFF",
+    "error": "#EF4444",
+    "onError": "#FFFFFF",
+    "info": "#3B82F6",
+    "onInfo": "#FFFFFF",
+    "border": "#E5E7EB",
+    "borderStrong": "#D1D5DB",
+    "divider": "#F3F4F6",
+    "muted": "#6B7280"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous iOS-native rhythms. Content must never touch the edges. Use md/lg spacing for list margins, avoid cramped items.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use on the bottom tab bar.",
+      "Use on sticky headers above scrolling lists.",
+      "Use for featured booking cards over background images."
+    ],
+    "dont's": [
+      "Do not use on regular form inputs or basic list rows."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Login",
+      "purpose": "Frictionless authentication using Google Auth or guest mode to avoid drop-off.",
+      "states": {
+        "loading": "Spinner on Google button.",
+        "empty": "N/A",
+        "error": "Failed login toast or inline error."
+      },
+      "layout": "Full-height view, clean dental interior blurred background or soft gradient, clinic logo wordmark, 'Entrar com Google' button using brand colors."
+    },
+    {
+      "name": "HomeDashboard",
+      "purpose": "Central hub for next appointments, live booking, and quick access to services.",
+      "states": {
+        "loading": "Skeleton of the next appointment card and service tiles.",
+        "empty": "Illustration of a calendar with 'Nenhuma consulta agendada', primary CTA to book.",
+        "error": "Failed to load dashboard data, retry button."
+      },
+      "layout": "Split-grid layout. Hero section with live 'Next Appointment' booking module featuring time-slot chips. Content bands for 'Our Services' (horizontal scroll tiles) and 'Dr. Jocélio' (doctor profile snippet). Sticky bottom tabs."
+    },
+    {
+      "name": "BookingFlow",
+      "purpose": "Step-by-step intuitive appointment booking.",
+      "states": {
+        "loading": "Loading available slots.",
+        "empty": "No slots available for the selected day, show calendar to pick another.",
+        "error": "Error fetching slots, retry button."
+      },
+      "layout": "Modular scheduling interface. Step 1: Service selection. Step 2: Date/Time grid (15-min increments). Step 3: Booking review summary. Bottom sticky CTA for 'Confirmar Agendamento'."
+    },
+    {
+      "name": "Appointments",
+      "purpose": "History of past visits and upcoming appointments.",
+      "states": {
+        "loading": "List skeletons.",
+        "empty": "'Você ainda não tem consultas agendadas.' with an icon and CTA to book.",
+        "error": "Error loading history, retry button."
+      },
+      "layout": "Segmented control (Próximas / Histórico). List items with date, time, service name, and dentist. Use glassmorphism on the sticky segment header."
+    },
+    {
+      "name": "Profile",
+      "purpose": "Patient medical/dental records and account settings.",
+      "states": {
+        "loading": "Spinner.",
+        "empty": "No records found.",
+        "error": "Error fetching profile."
+      },
+      "layout": "Avatar (initials if no image) and patient details. List of menu options (Meus Registros, Galeria Antes/Depois, Contato, Sair). Clean settings-style rows with right chevrons."
+    },
+    {
+      "name": "AdminDashboard",
+      "purpose": "Clinic management for appointments and patients.",
+      "states": {
+        "loading": "Skeleton of today's schedule.",
+        "empty": "No appointments for today.",
+        "error": "Failed to load admin data."
+      },
+      "layout": "Command-center style but clean. List of today's appointments with swipe-to-confirm or swipe-to-cancel actions. Quick stats at the top."
+    }
+  ],
+  "images": {
+    "google_logo": {
+      "url": "https://images.unsplash.com/photo-1706426629246-2a3c3e3e3ff2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwxfHxnb29nbGUlMjBnJTIwbG9nbyUyMHRyYW5zcGFyZW50JTIwcG5nfGVufDB8fHx8MTc5MzU0MjEwNnww&ixlib=rb-4.1.0&q=85",
+      "alt": "Google G Logo"
+    },
+    "dr_jocelio": {
+      "url": "https://images.unsplash.com/photo-1667133295308-9ef24f71952e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NDh8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBtYWxlJTIwZGVudGlzdCUyMHNtaWxpbmd8ZW58MHx8fHwxNzkzNTQyMDk0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Dr. Jocélio smiling in clinic"
+    },
+    "clinic_interior": {
+      "url": "https://images.unsplash.com/photo-1629909613654-28e377c37b09?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBkZW50YWwlMjBjbGluaWMlMjBpbnRlcmlvcnxlbnwwfHx8fDE3OTM1NDIwOTR8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Modern dental clinic interior"
+    },
+    "service_cleaning": {
+      "url": "https://images.unsplash.com/photo-1684607633217-462056580c3c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwzfHxkZW50YWwlMjBzZXJ2aWNlcyUyMHRlZXRoJTIwY2xlYW5pbmclMjB3aGl0ZW5pbmclMjBvcnRob2RvbnRpY3N8ZW58MHx8fHwxNzkzNTQyMDk0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Teeth cleaning service"
+    }
+  },
+  "haptics": {
+    "primary_button": "impactMedium",
+    "tab_press": "selection",
+    "booking_confirm": "notificationSuccess",
+    "time_slot_select": "selection"
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the '1 iOS-Native Clean' personality guidelines. Use rounded, humanist typography (Plus Jakarta Sans) and generous padding to avoid a cluttered or 'clinical' look.",
+    "Implement a bottom tab navigation with 4 tabs: Home, Agendamentos, Perfil, and Admin (hidden for regular patients).",
+    "Design the Home dashboard using a split-grid layout with a prominent, live 'Next Appointment' booking module featuring time-slot chips to reduce friction.",
+    "The primary action in the Booking flow must be a sticky bottom button inside a KeyboardAvoidingView/fixed footer so it's always accessible without scrolling.",
+    "The color palette uses classic dental blue (#1A73E8) and white to evoke trust and cleanliness, explicitly satisfying the user's request and overriding the 'no blue' rule.",
+    "Always apply gradient-to-dark scrims (Layer 1) before overlaying any text onto background images (e.g., in the Login or Hero sections) to guarantee readability (WCAG AA).",
+    "For the admin panel, prioritize a clean 'command center' feel with swipeable list rows for quick actions (confirm/cancel).",
+    "Ensure all interactive elements (chips, booking slots, buttons) meet a minimum 44x44pt touch target."
+  ]
+}
