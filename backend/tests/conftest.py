@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / "frontend" / ".env")
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get("EXPO_BACKEND_URL")).rstrip("/")
-ADMIN_PASSWORD = "Jocelio#4821"
+ADMIN_PASSWORD = "admin1234"
 PATIENT_EMAIL = "maria@test.com"
 PATIENT_PASSWORD = "senha123"
 

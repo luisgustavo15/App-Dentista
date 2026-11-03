@@ -5,9 +5,11 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type ClinicInfo } from "@/src/api/client";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 export default function ContactScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data } = useQuery({ queryKey: ["clinic"], queryFn: () => api.get<ClinicInfo>("/clinic") });
@@ -81,7 +83,7 @@ export default function ContactScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -108,4 +110,4 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontSize: 14, fontWeight: "700", color: colors.onSurface },
   rowSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
-});
+}));

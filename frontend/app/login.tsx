@@ -7,13 +7,15 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/auth/AuthContext";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 const HERO = "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=1000&q=80";
 
 type Mode = "login" | "register" | "admin";
 
 export default function LoginScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { login, register, adminLogin } = useAuth();
   const [mode, setMode] = useState<Mode>("login");
@@ -173,6 +175,8 @@ export default function LoginScreen() {
 }
 
 function Field({ icon, testID, ...props }: { icon: any; testID: string } & React.ComponentProps<typeof TextInput>) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <View style={styles.inputWrap}>
       <Ionicons name={icon} size={18} color={colors.muted} />
@@ -181,7 +185,7 @@ function Field({ icon, testID, ...props }: { icon: any; testID: string } & React
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.brandPrimary },
   scroll: { flexGrow: 1, justifyContent: "space-between", paddingHorizontal: spacing.xl, gap: spacing.xl },
   topArea: { alignItems: "center" },
@@ -214,4 +218,4 @@ const styles = StyleSheet.create({
   submitText: { color: colors.onBrandPrimary, fontSize: 16, fontWeight: "800" },
   linkBtn: { alignItems: "center", paddingVertical: spacing.sm, minHeight: 44, justifyContent: "center" },
   linkText: { color: colors.brandPrimary, fontSize: 13, fontWeight: "600" },
-});
+}));

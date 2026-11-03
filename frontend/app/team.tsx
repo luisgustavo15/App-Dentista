@@ -6,9 +6,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Dentist } from "@/src/api/client";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 export default function TeamScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data = [] } = useQuery({ queryKey: ["dentists"], queryFn: () => api.get<Dentist[]>("/dentists") });
@@ -39,7 +41,7 @@ export default function TeamScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -56,4 +58,4 @@ const styles = StyleSheet.create({
   specialty: { fontSize: 13, color: colors.brandPrimary, fontWeight: "700" },
   cro: { fontSize: 12, color: colors.muted },
   bio: { fontSize: 13, color: colors.onSurfaceSecondary, marginTop: spacing.sm, lineHeight: 19 },
-});
+}));

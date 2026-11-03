@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Appointment, type Dentist, type Service } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 const HERO = "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=1000&q=80";
 
@@ -18,6 +18,8 @@ function formatDate(date: string, time: string) {
 }
 
 export default function HomeScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
@@ -169,6 +171,8 @@ export default function HomeScreen() {
 }
 
 function QuickAction({ icon, label, onPress, testID }: { icon: any; label: string; onPress: () => void; testID: string }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <Pressable testID={testID} onPress={onPress} style={styles.qa}>
       <View style={styles.qaIcon}>
@@ -193,7 +197,7 @@ const statusStyles: Record<string, any> = {
   completed: { backgroundColor: "#E0E7FF", color: "#3730A3" },
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   hero: {
     height: 240,
@@ -275,4 +279,4 @@ const styles = StyleSheet.create({
   dentistName: { fontSize: 15, fontWeight: "800", color: colors.onSurface },
   dentistSpecialty: { fontSize: 12, color: colors.brandPrimary, fontWeight: "600", marginTop: 2 },
   dentistBio: { fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 17 },
-});
+}));

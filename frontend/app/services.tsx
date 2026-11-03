@@ -5,9 +5,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Service } from "@/src/api/client";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 export default function ServicesScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data = [] } = useQuery({ queryKey: ["services"], queryFn: () => api.get<Service[]>("/services") });
@@ -50,7 +52,7 @@ export default function ServicesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -72,4 +74,4 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { fontSize: 12, color: colors.muted },
   price: { fontSize: 15, fontWeight: "800", color: colors.brandPrimary },
-});
+}));

@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Dentist, type Service } from "@/src/api/client";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 function buildDates(n = 14) {
   const out: { key: string; label: string; weekday: string }[] = [];
@@ -26,6 +26,8 @@ function buildDates(n = 14) {
 }
 
 export default function BookingScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
@@ -225,7 +227,7 @@ export default function BookingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -299,4 +301,4 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.error, fontSize: 13, fontWeight: "600", marginBottom: spacing.sm, textAlign: "center" },
   confirmText: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 15 },
-});
+}));

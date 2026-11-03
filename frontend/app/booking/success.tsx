@@ -1,11 +1,12 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, type ThemeColors } from "@/src/theme";
 
 export default function BookingSuccess() {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string; time?: string; service?: string }>();
@@ -35,7 +36,7 @@ export default function BookingSuccess() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface, justifyContent: "space-between" },
   content: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
   check: { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.success, alignItems: "center", justifyContent: "center" },
@@ -48,4 +49,4 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 15 },
   secondary: { paddingVertical: 14, borderRadius: radius.md, alignItems: "center", borderWidth: 1, borderColor: colors.border },
   secondaryText: { color: colors.onSurface, fontWeight: "700", fontSize: 15 },
-});
+}));

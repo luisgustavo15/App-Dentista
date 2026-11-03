@@ -1,16 +1,25 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/auth/AuthContext";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, setThemePreference, spacing, useThemePreference, type ThemePreference, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
+
+const APPEARANCE: { key: ThemePreference; label: string; icon: any }[] = [
+  { key: "light", label: "Claro", icon: "sunny-outline" },
+  { key: "dark", label: "Escuro", icon: "moon-outline" },
+  { key: "system", label: "Automático", icon: "phone-portrait-outline" },
+];
 
 export default function ProfileScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const themePref = useThemePreference();
 
   const initials = (user?.name ?? "?")
     .split(" ")
@@ -52,6 +61,26 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Aparência</Text>
+          <View style={styles.appearance}>
+            {APPEARANCE.map((a) => {
+              const on = a.key === themePref;
+              return (
+                <Pressable
+                  key={a.key}
+                  testID={`theme-${a.key}`}
+                  onPress={() => setThemePreference(a.key)}
+                  style={[styles.appearanceItem, on && styles.appearanceActive]}
+                >
+                  <Ionicons name={a.icon} size={18} color={on ? colors.onBrandPrimary : colors.muted} />
+                  <Text style={[styles.appearanceText, on && { color: colors.onBrandPrimary }]}>{a.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Conta</Text>
           <MenuRow icon="log-out-outline" label="Sair" destructive testID="row-logout" onPress={logout} />
         </View>
@@ -63,6 +92,8 @@ export default function ProfileScreen() {
 }
 
 function MenuRow({ icon, label, onPress, destructive, testID }: { icon: any; label: string; onPress: () => void; destructive?: boolean; testID?: string }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <Pressable
       testID={testID}
@@ -78,7 +109,7 @@ function MenuRow({ icon, label, onPress, destructive, testID }: { icon: any; lab
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { alignItems: "center", padding: spacing.xl, gap: 6 },
   avatar: { width: 92, height: 92, borderRadius: 46, backgroundColor: colors.surfaceSecondary },
@@ -106,5 +137,13 @@ const styles = StyleSheet.create({
   },
   rowLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.onSurface },
 
+  appearance: { flexDirection: "row", gap: spacing.sm },
+  appearanceItem: {
+    flex: 1, minHeight: 64, borderRadius: radius.md, gap: 4,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border,
+  },
+  appearanceActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  appearanceText: { fontSize: 12, fontWeight: "700", color: colors.muted },
   version: { textAlign: "center", color: colors.muted, fontSize: 12, marginTop: spacing.xl },
-});
+}));

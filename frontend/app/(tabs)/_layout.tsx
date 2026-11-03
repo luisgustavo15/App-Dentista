@@ -1,11 +1,13 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Tabs } from "expo-router";
-import { Platform, StyleSheet } from "react-native";
+import { Platform } from "react-native";
 
 import { useAuth } from "@/src/auth/AuthContext";
-import { colors } from "@/src/theme";
+import { makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 export default function TabsLayout() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -57,6 +59,6 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   label: { fontSize: 11, fontWeight: "600" },
-});
+}));

@@ -6,9 +6,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type GalleryItem } from "@/src/api/client";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 export default function GalleryScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data = [] } = useQuery({ queryKey: ["gallery"], queryFn: () => api.get<GalleryItem[]>("/gallery") });
@@ -47,7 +49,7 @@ export default function GalleryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -68,4 +70,4 @@ const styles = StyleSheet.create({
   caseTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   service: { fontSize: 12, color: colors.brandPrimary, fontWeight: "700" },
   desc: { fontSize: 13, color: colors.onSurfaceSecondary, marginTop: 4, lineHeight: 19 },
-});
+}));

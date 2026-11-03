@@ -1,6 +1,8 @@
-// Design tokens for Clínica Odontológica Dr. Jocélio. Light theme only.
-import { useMemo } from "react";
+// Design tokens for Clínica Odontológica Dr. Jocélio. Light + dark themes.
+import { useMemo, useSyncExternalStore } from "react";
 import { Appearance, StyleSheet, useColorScheme } from "react-native";
+
+import { storage } from "@/src/utils/storage";
 
 export type ColorScheme = "light" | "dark";
 
@@ -44,9 +46,44 @@ const light = {
 
 export type ThemeColors = typeof light;
 
-export const defaultScheme = "light" satisfies ColorScheme;
-export const themes: { light: ThemeColors; dark?: ThemeColors } = { light };
+const dark: ThemeColors = {
+  surface: "#0B1220",
+  onSurface: "#F3F4F6",
+  surfaceSecondary: "#151E2E",
+  onSurfaceSecondary: "#CBD5E1",
+  surfaceTertiary: "#1E2A40",
+  onSurfaceTertiary: "#93C5FD",
+  surfaceInverse: "#F3F4F6",
+  onSurfaceInverse: "#111827",
+  muted: "#94A3B8",
 
+  brand: "#4C8DF6",
+  onBrand: "#FFFFFF",
+  brandPrimary: "#4C8DF6",
+  onBrandPrimary: "#FFFFFF",
+  brandSecondary: "#1A2B4A",
+  onBrandSecondary: "#93C5FD",
+  brandTertiary: "#1E3A66",
+  onBrandTertiary: "#BFDBFE",
+
+  success: "#34D399",
+  onSuccess: "#052E1C",
+  warning: "#FBBF24",
+  onWarning: "#3B2503",
+  error: "#F87171",
+  onError: "#3B0A0A",
+  info: "#60A5FA",
+  onInfo: "#0B1A33",
+
+  border: "#243045",
+  borderStrong: "#334155",
+  divider: "#1A2233",
+};
+
+export const defaultScheme = "light" satisfies ColorScheme;
+export const themes: { light: ThemeColors; dark?: ThemeColors } = { light, dark };
+
+/** Static light palette — only for places outside React (prefer useTheme()). */
 export const colors = light;
 
 export const spacing = {
@@ -66,16 +103,44 @@ export const radius = {
   pill: 999,
 } as const;
 
+// User preference: "light" | "dark" | null (follow system). Kept in a tiny store so web works too.
+export type ThemePreference = ColorScheme | "system";
+const THEME_PREF_KEY = "theme_preference";
+let preference: ThemePreference = "system";
+const listeners = new Set<() => void>();
+
 export function setColorScheme(scheme: ColorScheme | null) {
+  preference = scheme ?? "system";
   Appearance.setColorScheme?.(scheme ?? "unspecified");
+  listeners.forEach((l) => l());
 }
 
-setColorScheme?.(themes.dark ? null : defaultScheme);
+export async function setThemePreference(pref: ThemePreference) {
+  setColorScheme(pref === "system" ? null : pref);
+  await storage.setItem(THEME_PREF_KEY, pref);
+}
+
+export async function loadThemePreference() {
+  const pref = await storage.getItem<ThemePreference>(THEME_PREF_KEY, "system");
+  setColorScheme(pref === "system" ? null : (pref as ColorScheme));
+}
+
+export function useThemePreference(): ThemePreference {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => preference,
+    () => preference,
+  );
+}
 
 export function useTheme(): { scheme: ColorScheme; colors: ThemeColors } {
   const system = useColorScheme();
-  const scheme: ColorScheme =
-    (system === "light" || system === "dark") && themes[system] ? system : defaultScheme;
+  const pref = useThemePreference();
+  const resolved = pref === "system" ? system : pref;
+  const scheme: ColorScheme = resolved === "dark" && themes.dark ? "dark" : "light";
   return { scheme, colors: themes[scheme] ?? themes.light };
 }
 

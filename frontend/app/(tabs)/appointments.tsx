@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Appointment } from "@/src/api/client";
-import { colors, radius, spacing } from "@/src/theme";
+import { radius, spacing, makeStyles, useTheme, type ThemeColors } from "@/src/theme";
 
 const TABS = [
   { key: "upcoming", label: "Próximas" },
@@ -30,6 +30,8 @@ const statusColors: Record<string, { bg: string; fg: string }> = {
 };
 
 export default function AppointmentsScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
@@ -84,7 +86,7 @@ export default function AppointmentsScreen() {
 
       <ScrollView
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing["3xl"] }}
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.brandPrimary} />}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={() => { refetch(); }} tintColor={colors.brandPrimary} />}
       >
         {isFetching && data.length === 0 ? (
           <ActivityIndicator color={colors.brandPrimary} style={{ marginTop: 40 }} />
@@ -146,7 +148,7 @@ export default function AppointmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors: ThemeColors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {
     paddingHorizontal: spacing.lg,
@@ -192,4 +194,4 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.error, marginTop: spacing.xs,
   },
   cancelText: { color: colors.error, fontWeight: "700", fontSize: 13 },
-});
+}));

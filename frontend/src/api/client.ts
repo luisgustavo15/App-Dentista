@@ -69,6 +69,7 @@ export type Service = {
   duration_min: number;
   price: number;
   icon: string;
+  active?: boolean;
 };
 
 export type Dentist = {
@@ -101,6 +102,7 @@ export type Appointment = {
   date: string;
   time: string;
   notes: string;
+  price: number;
   status: "pending" | "confirmed" | "cancelled" | "completed";
   created_at: string;
 };
@@ -114,4 +116,15 @@ export type ClinicInfo = {
   hours: string;
   lat: number;
   lng: number;
+};
+
+export type FinancePeriod = "month" | "last_month" | "year" | "all";
+
+export type Finance = {
+  period: FinancePeriod;
+  total_revenue: number;
+  completed_count: number;
+  average_ticket: number;
+  expected_revenue: number;
+  by_service: { service_name: string; count: number; revenue: number }[];
 };

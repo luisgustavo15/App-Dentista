@@ -85,6 +85,24 @@ class Service(BaseModel):
     duration_min: int
     price: float
     icon: str  # ionicon name
+    active: bool = True
+
+
+class ServiceIn(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    description: str = Field(default="", max_length=400)
+    duration_min: int = Field(ge=5, le=480)
+    price: float = Field(ge=0, le=1_000_000)
+    icon: str = Field(default="medkit-outline", max_length=60)
+
+
+class ServiceUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    description: Optional[str] = Field(default=None, max_length=400)
+    duration_min: Optional[int] = Field(default=None, ge=5, le=480)
+    price: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+    icon: Optional[str] = Field(default=None, max_length=60)
+    active: Optional[bool] = None
 
 
 class Dentist(BaseModel):
@@ -125,6 +143,7 @@ class Appointment(BaseModel):
     date: str
     time: str
     notes: str = ""
+    price: float = 0.0  # service price frozen at booking time
     status: str = "pending"  # pending | confirmed | cancelled | completed
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -263,7 +282,7 @@ async def update_profile(payload: ProfileUpdate, user: User = Depends(get_curren
 # ============================================================
 @api_router.get("/services", response_model=List[Service])
 async def list_services():
-    items = await db.services.find({}, {"_id": 0}).to_list(100)
+    items = await db.services.find({"active": {"$ne": False}}, {"_id": 0}).to_list(200)
     return [Service(**s) for s in items]
 
 
@@ -324,7 +343,7 @@ async def available_slots(date: str, dentist_id: str, user: User = Depends(get_c
 
 @api_router.post("/appointments", response_model=Appointment)
 async def create_appointment(payload: AppointmentCreate, user: User = Depends(get_current_user)):
-    service = await db.services.find_one({"id": payload.service_id}, {"_id": 0})
+    service = await db.services.find_one({"id": payload.service_id, "active": {"$ne": False}}, {"_id": 0})
     dentist = await db.dentists.find_one({"id": payload.dentist_id}, {"_id": 0})
     if not service or not dentist:
         raise HTTPException(status_code=400, detail="Invalid service or dentist")
@@ -355,6 +374,7 @@ async def create_appointment(payload: AppointmentCreate, user: User = Depends(ge
         date=payload.date,
         time=payload.time,
         notes=payload.notes or "",
+        price=float(service["price"]),
     )
     await db.appointments.insert_one(appt.model_dump())
     return appt
@@ -413,6 +433,92 @@ async def admin_stats(user: User = Depends(require_admin)):
         "pending": pending,
         "confirmed": confirmed,
         "patients": patients,
+    }
+
+
+# ---------- Admin: procedures ----------
+@api_router.get("/admin/services", response_model=List[Service])
+async def admin_list_services(user: User = Depends(require_admin)):
+    items = await db.services.find({}, {"_id": 0}).to_list(500)
+    items.sort(key=lambda s: s["name"].lower())
+    return [Service(**s) for s in items]
+
+
+@api_router.post("/admin/services", response_model=Service, status_code=201)
+async def admin_create_service(payload: ServiceIn, user: User = Depends(require_admin)):
+    svc = Service(**payload.model_dump())
+    await db.services.insert_one(svc.model_dump())
+    return svc
+
+
+@api_router.put("/admin/services/{service_id}", response_model=Service)
+async def admin_update_service(service_id: str, payload: ServiceUpdate, user: User = Depends(require_admin)):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    res = await db.services.update_one({"id": service_id}, {"$set": update}) if update else None
+    doc = await db.services.find_one({"id": service_id}, {"_id": 0})
+    if not doc or (res is not None and res.matched_count == 0):
+        raise HTTPException(status_code=404, detail="Procedimento não encontrado")
+    if "name" in update:
+        await db.appointments.update_many(
+            {"service_id": service_id, "status": {"$in": ["pending", "confirmed"]}},
+            {"$set": {"service_name": update["name"]}},
+        )
+    return Service(**doc)
+
+
+@api_router.delete("/admin/services/{service_id}")
+async def admin_remove_service(service_id: str, user: User = Depends(require_admin)):
+    # Soft delete: keeps history/finance intact and allows restoring later.
+    res = await db.services.update_one({"id": service_id}, {"$set": {"active": False}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Procedimento não encontrado")
+    return {"ok": True}
+
+
+# ---------- Admin: finance ----------
+def _period_range(period: str):
+    today = datetime.now(CLINIC_TZ).date()
+    if period == "month":
+        start = today.replace(day=1)
+        return str(start), str(today)
+    if period == "last_month":
+        end = today.replace(day=1) - timedelta(days=1)
+        return str(end.replace(day=1)), str(end)
+    if period == "year":
+        return str(today.replace(month=1, day=1)), str(today)
+    if period == "all":
+        return None, None
+    raise HTTPException(status_code=400, detail="Período inválido")
+
+
+@api_router.get("/admin/finance")
+async def admin_finance(period: str = "month", user: User = Depends(require_admin)):
+    start, end = _period_range(period)
+    query: dict = {"status": "completed"}
+    if start:
+        query["date"] = {"$gte": start, "$lte": end}
+    done = await db.appointments.find(query, {"_id": 0}).to_list(10000)
+
+    by_service: dict = {}
+    for a in done:
+        row = by_service.setdefault(a["service_name"], {"service_name": a["service_name"], "count": 0, "revenue": 0.0})
+        row["count"] += 1
+        row["revenue"] += float(a.get("price", 0))
+    total = sum(r["revenue"] for r in by_service.values())
+    count = len(done)
+
+    upcoming = await db.appointments.find(
+        {"status": {"$in": ["pending", "confirmed"]}}, {"_id": 0, "price": 1}
+    ).to_list(10000)
+    return {
+        "period": period,
+        "start": start,
+        "end": end,
+        "total_revenue": round(total, 2),
+        "completed_count": count,
+        "average_ticket": round(total / count, 2) if count else 0.0,
+        "expected_revenue": round(sum(float(u.get("price", 0)) for u in upcoming), 2),
+        "by_service": sorted(by_service.values(), key=lambda r: r["revenue"], reverse=True),
     }
 
 
@@ -511,6 +617,11 @@ async def startup_seed():
     if await db.services.count_documents({}) == 0:
         for s in SERVICES_SEED:
             await db.services.insert_one(Service(**s).model_dump())
+
+    # Backfill frozen price for appointments created before prices were stored
+    async for a in db.appointments.find({"price": {"$exists": False}}, {"_id": 0, "id": 1, "service_id": 1}):
+        svc = await db.services.find_one({"id": a["service_id"]}, {"_id": 0, "price": 1})
+        await db.appointments.update_one({"id": a["id"]}, {"$set": {"price": float(svc["price"]) if svc else 0.0}})
 
     if await db.dentists.count_documents({}) == 0:
         for d in DENTISTS_SEED:
